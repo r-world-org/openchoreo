@@ -212,6 +212,7 @@ const (
 	INTERNALERROR        ErrorResponseCode = "INTERNAL_ERROR"
 	NOTFOUND             ErrorResponseCode = "NOT_FOUND"
 	NOTIMPLEMENTED       ErrorResponseCode = "NOT_IMPLEMENTED"
+	PRECONDITIONFAILED   ErrorResponseCode = "PRECONDITION_FAILED"
 	UNAUTHORIZED         ErrorResponseCode = "UNAUTHORIZED"
 	UNKNOWNGITPROVIDER   ErrorResponseCode = "UNKNOWN_GIT_PROVIDER"
 	UNPROCESSABLECONTENT ErrorResponseCode = "UNPROCESSABLE_CONTENT"
@@ -4764,11 +4765,17 @@ type NotFound = ErrorResponse
 // NotImplemented Standard error response format
 type NotImplemented = ErrorResponse
 
+// PreconditionFailed Standard error response format
+type PreconditionFailed = ErrorResponse
+
 // Unauthorized Standard error response format
 type Unauthorized = ErrorResponse
 
 // UnprocessableContent Standard error response format
 type UnprocessableContent = ErrorResponse
+
+// UpdateConflict Standard error response format
+type UpdateConflict = ErrorResponse
 
 // EvaluatesJSONBody defines parameters for Evaluates.
 type EvaluatesJSONBody = []EvaluateRequest
@@ -5243,6 +5250,12 @@ type ListReleaseBindingsParams struct {
 	// Cursor Opaque pagination cursor from a previous response.
 	// Pass the `nextCursor` value from pagination metadata to fetch the next page.
 	Cursor *CursorParam `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// UpdateReleaseBindingParams defines parameters for UpdateReleaseBinding.
+type UpdateReleaseBindingParams struct {
+	// IfOpenChoreoWriteRevision Optional ReleaseBinding write revision returned by GET or a prior successful PUT
+	IfOpenChoreoWriteRevision *string `json:"If-OpenChoreo-Write-Revision,omitempty"`
 }
 
 // GetReleaseBindingK8sResourceEventsParams defines parameters for GetReleaseBindingK8sResourceEvents.

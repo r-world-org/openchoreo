@@ -675,7 +675,7 @@ func addNamespacedScopedResources(reg map[string]resourceEntry) {
 			return r.StatusCode(), r.Body, nil
 		},
 		update: func(ctx context.Context, c *gen.ClientWithResponses, ns, name string, body io.Reader) (int, []byte, error) {
-			r, err := c.UpdateReleaseBindingWithBodyWithResponse(ctx, ns, name, contentTypeJSON, body)
+			r, err := c.UpdateReleaseBindingWithBodyWithResponse(ctx, ns, name, nil, contentTypeJSON, body)
 			if err != nil {
 				return 0, nil, err
 			}

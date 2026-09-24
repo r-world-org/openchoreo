@@ -615,9 +615,9 @@ type ClientInterface interface {
 	GetReleaseBinding(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateReleaseBindingWithBody request with any body
-	UpdateReleaseBindingWithBody(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateReleaseBindingWithBody(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	UpdateReleaseBinding(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateReleaseBinding(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetReleaseBindingK8sResourceEvents request
 	GetReleaseBindingK8sResourceEvents(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *GetReleaseBindingK8sResourceEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3191,8 +3191,8 @@ func (c *Client) GetReleaseBinding(ctx context.Context, namespaceName NamespaceN
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateReleaseBindingWithBody(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateReleaseBindingRequestWithBody(c.Server, namespaceName, releaseBindingName, contentType, body)
+func (c *Client) UpdateReleaseBindingWithBody(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateReleaseBindingRequestWithBody(c.Server, namespaceName, releaseBindingName, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3203,8 +3203,8 @@ func (c *Client) UpdateReleaseBindingWithBody(ctx context.Context, namespaceName
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateReleaseBinding(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateReleaseBindingRequest(c.Server, namespaceName, releaseBindingName, body)
+func (c *Client) UpdateReleaseBinding(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateReleaseBindingRequest(c.Server, namespaceName, releaseBindingName, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -11524,18 +11524,18 @@ func NewGetReleaseBindingRequest(server string, namespaceName NamespaceNameParam
 }
 
 // NewUpdateReleaseBindingRequest calls the generic UpdateReleaseBinding builder with application/json body
-func NewUpdateReleaseBindingRequest(server string, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, body UpdateReleaseBindingJSONRequestBody) (*http.Request, error) {
+func NewUpdateReleaseBindingRequest(server string, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, body UpdateReleaseBindingJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateReleaseBindingRequestWithBody(server, namespaceName, releaseBindingName, "application/json", bodyReader)
+	return NewUpdateReleaseBindingRequestWithBody(server, namespaceName, releaseBindingName, params, "application/json", bodyReader)
 }
 
 // NewUpdateReleaseBindingRequestWithBody generates requests for UpdateReleaseBinding with any type of body
-func NewUpdateReleaseBindingRequestWithBody(server string, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateReleaseBindingRequestWithBody(server string, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -11573,6 +11573,21 @@ func NewUpdateReleaseBindingRequestWithBody(server string, namespaceName Namespa
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfOpenChoreoWriteRevision != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithLocation("simple", false, "If-OpenChoreo-Write-Revision", runtime.ParamLocationHeader, *params.IfOpenChoreoWriteRevision)
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-OpenChoreo-Write-Revision", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -16073,9 +16088,9 @@ type ClientWithResponsesInterface interface {
 	GetReleaseBindingWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, reqEditors ...RequestEditorFn) (*GetReleaseBindingResp, error)
 
 	// UpdateReleaseBindingWithBodyWithResponse request with any body
-	UpdateReleaseBindingWithBodyWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error)
+	UpdateReleaseBindingWithBodyWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error)
 
-	UpdateReleaseBindingWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error)
+	UpdateReleaseBindingWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error)
 
 	// GetReleaseBindingK8sResourceEventsWithResponse request
 	GetReleaseBindingK8sResourceEventsWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *GetReleaseBindingK8sResourceEventsParams, reqEditors ...RequestEditorFn) (*GetReleaseBindingK8sResourceEventsResp, error)
@@ -20104,6 +20119,8 @@ type UpdateReleaseBindingResp struct {
 	JSON401      *Unauthorized
 	JSON403      *Forbidden
 	JSON404      *NotFound
+	JSON409      *UpdateConflict
+	JSON412      *PreconditionFailed
 	JSON422      *UnprocessableContent
 	JSON500      *InternalError
 }
@@ -23720,16 +23737,16 @@ func (c *ClientWithResponses) GetReleaseBindingWithResponse(ctx context.Context,
 }
 
 // UpdateReleaseBindingWithBodyWithResponse request with arbitrary body returning *UpdateReleaseBindingResp
-func (c *ClientWithResponses) UpdateReleaseBindingWithBodyWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error) {
-	rsp, err := c.UpdateReleaseBindingWithBody(ctx, namespaceName, releaseBindingName, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateReleaseBindingWithBodyWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error) {
+	rsp, err := c.UpdateReleaseBindingWithBody(ctx, namespaceName, releaseBindingName, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
 	return ParseUpdateReleaseBindingResp(rsp)
 }
 
-func (c *ClientWithResponses) UpdateReleaseBindingWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error) {
-	rsp, err := c.UpdateReleaseBinding(ctx, namespaceName, releaseBindingName, body, reqEditors...)
+func (c *ClientWithResponses) UpdateReleaseBindingWithResponse(ctx context.Context, namespaceName NamespaceNameParam, releaseBindingName ReleaseBindingNameParam, params *UpdateReleaseBindingParams, body UpdateReleaseBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateReleaseBindingResp, error) {
+	rsp, err := c.UpdateReleaseBinding(ctx, namespaceName, releaseBindingName, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -32842,6 +32859,20 @@ func ParseUpdateReleaseBindingResp(rsp *http.Response) (*UpdateReleaseBindingRes
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest UpdateConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest PreconditionFailed
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON412 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest UnprocessableContent

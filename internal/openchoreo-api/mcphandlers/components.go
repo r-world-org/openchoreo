@@ -296,7 +296,7 @@ func (h *MCPHandler) UpdateReleaseBinding(
 		rb.Spec.WorkloadOverrides = &wo
 	}
 
-	updated, err := h.services.ReleaseBindingService.UpdateReleaseBinding(ctx, namespaceName, rb)
+	updated, err := h.services.ReleaseBindingService.UpdateReleaseBinding(ctx, namespaceName, rb, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -4,22 +4,29 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
 	authzcore "github.com/openchoreo/openchoreo/internal/authz/core"
+	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services/handlerservices"
 	releasebindingsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/releasebinding"
@@ -30,6 +37,16 @@ import (
 type rbBundle struct {
 	handler    http.Handler
 	fakeClient client.Client
+}
+
+func doRequestWithWriteRevision(t *testing.T, h http.Handler, path string, body []byte, revision string) (*http.Request, *httptest.ResponseRecorder) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPut, path, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("If-OpenChoreo-Write-Revision", revision)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return req, rec
 }
 
 // newRBBundle builds an rbBundle seeded with the given objects and using the
@@ -138,7 +155,8 @@ func TestReleaseBindingHTTPListEmpty(t *testing.T) {
 // --- Get ---
 
 func TestReleaseBindingHTTPGet(t *testing.T) {
-	bundle := newRBBundle(t, []client.Object{seedReleaseBinding("rb-1")}, &allowAllPDP{})
+	seed := seedReleaseBinding("rb-1")
+	bundle := newRBBundle(t, []client.Object{seed}, &allowAllPDP{})
 
 	req, rec := doRequest(t, bundle.handler, http.MethodGet,
 		"/api/v1/namespaces/"+testNS+"/releasebindings/rb-1", nil)
@@ -149,6 +167,9 @@ func TestReleaseBindingHTTPGet(t *testing.T) {
 	var resp gen.ReleaseBinding
 	require.NoError(t, json.Unmarshal(bodyBytes, &resp))
 	assert.Equal(t, "rb-1", resp.Metadata.Name)
+	expectedRevision, err := releasebindingsvc.SemanticWriteRevision(seed)
+	require.NoError(t, err)
+	assert.Equal(t, expectedRevision, rec.Header().Get("OpenChoreo-Write-Revision"))
 
 	assertConformsToSpec(t, req, rec.Code, rec.Result().Header, bodyBytes)
 }
@@ -293,6 +314,171 @@ func TestReleaseBindingHTTPUpdateForbidden(t *testing.T) {
 		"/api/v1/namespaces/"+testNS+"/releasebindings/rb-1", body)
 
 	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestReleaseBindingHTTPConditionalUpdate(t *testing.T) {
+	path := "/api/v1/namespaces/" + testNS + "/releasebindings/rb-1"
+
+	t.Run("exact write revision succeeds and returns the updated revision", func(t *testing.T) {
+		seed := seedReleaseBinding("rb-1")
+		seed.Spec.ReleaseName = "release-1"
+		bundle := newRBBundle(t, []client.Object{seed}, &allowAllPDP{})
+		expected, err := releasebindingsvc.SemanticWriteRevision(seed)
+		require.NoError(t, err)
+
+		bodyObj := newReleaseBindingBody("rb-1")
+		bodyObj.Spec.ReleaseName = ptr.To("release-2")
+		body, err := json.Marshal(bodyObj)
+		require.NoError(t, err)
+		req, rec := doRequestWithWriteRevision(t, bundle.handler, path, body, expected)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var response gen.ReleaseBinding
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+		require.NotNil(t, response.Spec)
+		require.Equal(t, "release-2", *response.Spec.ReleaseName)
+		updatedRevision := rec.Header().Get("OpenChoreo-Write-Revision")
+		assert.NotEmpty(t, updatedRevision)
+		assert.NotEqual(t, expected, updatedRevision)
+		assertConformsToSpec(t, req, rec.Code, rec.Result().Header, rec.Body.Bytes())
+	})
+
+	t.Run("stale write revision returns 412 without mutation", func(t *testing.T) {
+		seed := seedReleaseBinding("rb-1")
+		seed.Spec.ReleaseName = "release-1"
+		bundle := newRBBundle(t, []client.Object{seed}, &allowAllPDP{})
+		stale := "rb-sha256:0000000000000000000000000000000000000000000000000000000000000000"
+		bodyObj := newReleaseBindingBody("rb-1")
+		bodyObj.Spec.ReleaseName = ptr.To("release-2")
+		body, err := json.Marshal(bodyObj)
+		require.NoError(t, err)
+
+		_, rec := doRequestWithWriteRevision(t, bundle.handler, path, body, stale)
+		require.Equal(t, http.StatusPreconditionFailed, rec.Code)
+		var current openchoreov1alpha1.ReleaseBinding
+		require.NoError(t, bundle.fakeClient.Get(context.Background(), types.NamespacedName{Name: "rb-1", Namespace: testNS}, &current))
+		assert.Equal(t, "release-1", current.Spec.ReleaseName)
+	})
+
+	invalid := map[string]string{
+		"empty":               "",
+		"wrong-prefix":        "other:0000000000000000000000000000000000000000000000000000000000000000",
+		"uppercase":           "rb-sha256:ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+		"wrong-length-short":  "rb-sha256:0",
+		"wrong-length-long":   "rb-sha256:00000000000000000000000000000000000000000000000000000000000000000",
+		"comma-list":          "rb-sha256:0000000000000000000000000000000000000000000000000000000000000000,rb-sha256:1111111111111111111111111111111111111111111111111111111111111111",
+		"leading-whitespace":  " rb-sha256:0000000000000000000000000000000000000000000000000000000000000000",
+		"trailing-whitespace": "rb-sha256:0000000000000000000000000000000000000000000000000000000000000000 ",
+	}
+	for name, value := range invalid {
+		t.Run("malformed "+name+" returns 400 without mutation", func(t *testing.T) {
+			seed := seedReleaseBinding("rb-1")
+			seed.Spec.ReleaseName = "release-1"
+			bundle := newRBBundle(t, []client.Object{seed}, &allowAllPDP{})
+			bodyObj := newReleaseBindingBody("rb-1")
+			bodyObj.Spec.ReleaseName = ptr.To("release-2")
+			body, err := json.Marshal(bodyObj)
+			require.NoError(t, err)
+
+			_, rec := doRequestWithWriteRevision(t, bundle.handler, path, body, value)
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var current openchoreov1alpha1.ReleaseBinding
+			require.NoError(t, bundle.fakeClient.Get(context.Background(), types.NamespacedName{Name: "rb-1", Namespace: testNS}, &current))
+			assert.Equal(t, "release-1", current.Spec.ReleaseName)
+		})
+	}
+
+	t.Run("authorization denial precedes a valid precondition and does not mutate", func(t *testing.T) {
+		seed := seedReleaseBinding("rb-1")
+		seed.Spec.ReleaseName = "release-1"
+		expected, err := releasebindingsvc.SemanticWriteRevision(seed)
+		require.NoError(t, err)
+		bundle := newRBBundle(t, []client.Object{seed}, &denyAllPDP{})
+		bodyObj := newReleaseBindingBody("rb-1")
+		bodyObj.Spec.ReleaseName = ptr.To("release-2")
+		body, err := json.Marshal(bodyObj)
+		require.NoError(t, err)
+
+		_, rec := doRequestWithWriteRevision(t, bundle.handler, path, body, expected)
+		require.Equal(t, http.StatusForbidden, rec.Code)
+		var current openchoreov1alpha1.ReleaseBinding
+		require.NoError(t, bundle.fakeClient.Get(context.Background(), types.NamespacedName{Name: "rb-1", Namespace: testNS}, &current))
+		assert.Equal(t, "release-1", current.Spec.ReleaseName)
+	})
+
+	t.Run("releaseName-only update preserves all other admitted mutable state", func(t *testing.T) {
+		seed := seedReleaseBinding("rb-1")
+		seed.UID = types.UID("uid-1")
+		seed.Labels = map[string]string{
+			labels.LabelKeyProjectName:   "test-proj",
+			labels.LabelKeyComponentName: "test-comp",
+			"team":                       "payments",
+		}
+		seed.Annotations = map[string]string{"note": "preserve"}
+		seed.Spec.ReleaseName = "release-1"
+		seed.Spec.ComponentTypeEnvironmentConfigs = &runtime.RawExtension{Raw: []byte(`{"replicas":2}`)}
+		seed.Spec.TraitEnvironmentConfigs = map[string]runtime.RawExtension{"scaler": {Raw: []byte(`{"max":5}`)}}
+		seed.Spec.WorkloadOverrides = &openchoreov1alpha1.WorkloadOverrideTemplateSpec{
+			Container: &openchoreov1alpha1.ContainerOverride{Env: []openchoreov1alpha1.EnvVar{{Key: "MODE", Value: "safe"}}},
+		}
+		seed.Spec.State = openchoreov1alpha1.ReleaseStateUndeploy
+		expectedRevision, err := releasebindingsvc.SemanticWriteRevision(seed)
+		require.NoError(t, err)
+		bundle := newRBBundle(t, []client.Object{seed}, &allowAllPDP{})
+
+		bodyObj, err := convert[openchoreov1alpha1.ReleaseBinding, gen.ReleaseBinding](*seed.DeepCopy())
+		require.NoError(t, err)
+		bodyObj.Spec.ReleaseName = ptr.To("release-2")
+		body, err := json.Marshal(bodyObj)
+		require.NoError(t, err)
+		_, rec := doRequestWithWriteRevision(t, bundle.handler, path, body, expectedRevision)
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var current openchoreov1alpha1.ReleaseBinding
+		require.NoError(t, bundle.fakeClient.Get(context.Background(), types.NamespacedName{Name: "rb-1", Namespace: testNS}, &current))
+		assert.Equal(t, "release-2", current.Spec.ReleaseName)
+		assert.Equal(t, seed.Labels, current.Labels)
+		assert.Equal(t, seed.Annotations, current.Annotations)
+		assert.Equal(t, seed.Spec.Owner, current.Spec.Owner)
+		assert.Equal(t, seed.Spec.Environment, current.Spec.Environment)
+		assert.Equal(t, seed.Spec.ComponentTypeEnvironmentConfigs, current.Spec.ComponentTypeEnvironmentConfigs)
+		assert.Equal(t, seed.Spec.TraitEnvironmentConfigs, current.Spec.TraitEnvironmentConfigs)
+		assert.Equal(t, seed.Spec.WorkloadOverrides, current.Spec.WorkloadOverrides)
+		assert.Equal(t, seed.Spec.State, current.Spec.State)
+	})
+}
+
+func TestReleaseBindingHTTPKubernetesConflict(t *testing.T) {
+	seed := seedReleaseBinding("rb-1")
+	seed.Spec.ReleaseName = "release-1"
+	expected, err := releasebindingsvc.SemanticWriteRevision(seed)
+	require.NoError(t, err)
+	updateCalls := 0
+	fc := fake.NewClientBuilder().
+		WithScheme(newTestScheme(t)).
+		WithObjects(seed).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(context.Context, client.WithWatch, client.Object, ...client.UpdateOption) error {
+				updateCalls++
+				return apierrors.NewConflict(
+					schema.GroupResource{Group: openchoreov1alpha1.GroupVersion.Group, Resource: "releasebindings"},
+					"rb-1",
+					assert.AnError,
+				)
+			},
+		}).
+		Build()
+	svc := releasebindingsvc.NewServiceWithAuthz(fc, &allowAllPDP{}, slog.Default())
+	handler := newTestHTTPHandler(t, &handlerservices.Services{ReleaseBindingService: svc})
+	bodyObj := newReleaseBindingBody("rb-1")
+	bodyObj.Spec.ReleaseName = ptr.To("release-2")
+	body, err := json.Marshal(bodyObj)
+	require.NoError(t, err)
+
+	_, rec := doRequestWithWriteRevision(t, handler,
+		"/api/v1/namespaces/"+testNS+"/releasebindings/rb-1", body, expected)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, 1, updateCalls, "provider must not retry a conflicting Kubernetes update")
 }
 
 // --- Delete ---

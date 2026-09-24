@@ -87,7 +87,7 @@ func (s *releaseBindingService) CreateReleaseBinding(ctx context.Context, namesp
 	return rb, nil
 }
 
-func (s *releaseBindingService) UpdateReleaseBinding(ctx context.Context, namespaceName string, rb *openchoreov1alpha1.ReleaseBinding) (*openchoreov1alpha1.ReleaseBinding, error) {
+func (s *releaseBindingService) UpdateReleaseBinding(ctx context.Context, namespaceName string, rb *openchoreov1alpha1.ReleaseBinding, expectedRevision *string) (*openchoreov1alpha1.ReleaseBinding, error) {
 	if rb == nil {
 		return nil, fmt.Errorf("release binding cannot be nil")
 	}
@@ -102,6 +102,15 @@ func (s *releaseBindingService) UpdateReleaseBinding(ctx context.Context, namesp
 		}
 		s.logger.Error("Failed to get release binding", "error", err)
 		return nil, fmt.Errorf("failed to get release binding: %w", err)
+	}
+	if expectedRevision != nil {
+		currentRevision, err := SemanticWriteRevision(existing)
+		if err != nil {
+			return nil, fmt.Errorf("compute current release binding write revision: %w", err)
+		}
+		if *expectedRevision != currentRevision {
+			return nil, ErrReleaseBindingPreconditionFailed
+		}
 	}
 
 	// Clear status from user input — status is server-managed
@@ -120,6 +129,10 @@ func (s *releaseBindingService) UpdateReleaseBinding(ctx context.Context, namesp
 	existing.Labels[labels.LabelKeyComponentName] = existing.Spec.Owner.ComponentName
 
 	if err := s.k8sClient.Update(ctx, existing); err != nil {
+		if apierrors.IsConflict(err) {
+			s.logger.Warn("Release binding update conflicted", "namespace", namespaceName, "releaseBinding", rb.Name)
+			return nil, ErrReleaseBindingConflict
+		}
 		if vErr := services.ExtractValidationError(err); vErr != nil {
 			s.logger.Error("Release binding update rejected by validation", "error", err)
 			return nil, vErr

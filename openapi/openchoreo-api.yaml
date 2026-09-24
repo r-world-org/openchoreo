@@ -4278,6 +4278,13 @@ paths:
       responses:
         '200':
           description: Release binding details
+          headers:
+            OpenChoreo-Write-Revision:
+              description: Semantic revision of the writable ReleaseBinding state, formatted as rb-sha256 followed by a colon and 64 lowercase hexadecimal characters
+              schema:
+                type: string
+                pattern: '^rb-sha256:[0-9a-f]{64}$'
+                example: rb-sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           content:
             application/json:
               schema:
@@ -4299,6 +4306,14 @@ paths:
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
         - $ref: '#/components/parameters/ReleaseBindingNameParam'
+        - name: If-OpenChoreo-Write-Revision
+          in: header
+          required: false
+          description: Optional ReleaseBinding write revision returned by GET or a prior successful PUT
+          schema:
+            type: string
+            pattern: '^rb-sha256:[0-9a-f]{64}$'
+            example: rb-sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       requestBody:
         required: true
         content:
@@ -4308,6 +4323,13 @@ paths:
       responses:
         '200':
           description: Release binding updated successfully
+          headers:
+            OpenChoreo-Write-Revision:
+              description: Semantic revision of the updated writable ReleaseBinding state, formatted as rb-sha256 followed by a colon and 64 lowercase hexadecimal characters
+              schema:
+                type: string
+                pattern: '^rb-sha256:[0-9a-f]{64}$'
+                example: rb-sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           content:
             application/json:
               schema:
@@ -4322,6 +4344,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/UpdateConflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -6808,6 +6834,26 @@ components:
             error: "Project 'my-project' already exists"
             code: CONFLICT
 
+    UpdateConflict:
+      description: The resource was concurrently modified while the update was being applied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "ReleaseBinding update conflict"
+            code: CONFLICT
+
+    PreconditionFailed:
+      description: The supplied ReleaseBinding write revision does not match the current writable state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "ReleaseBinding precondition failed"
+            code: PRECONDITION_FAILED
+
     UnprocessableContent:
       description: Request body is well-formed but failed validation
       content:
@@ -6881,6 +6927,7 @@ components:
             - FORBIDDEN
             - NOT_FOUND
             - CONFLICT
+            - PRECONDITION_FAILED
             - UNPROCESSABLE_CONTENT
             - INTERNAL_ERROR
             - NOT_IMPLEMENTED

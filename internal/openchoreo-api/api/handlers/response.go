@@ -35,6 +35,20 @@ func conflict(message string) gen.ConflictJSONResponse {
 	}
 }
 
+func updateConflict(message string) gen.UpdateConflictJSONResponse {
+	return gen.UpdateConflictJSONResponse{
+		Code:  gen.CONFLICT,
+		Error: message,
+	}
+}
+
+func preconditionFailed(message string) gen.PreconditionFailedJSONResponse {
+	return gen.PreconditionFailedJSONResponse{
+		Code:  gen.PRECONDITIONFAILED,
+		Error: message,
+	}
+}
+
 func unprocessableContent(message string) gen.UnprocessableContentJSONResponse {
 	return gen.UnprocessableContentJSONResponse{
 		Code:  gen.UNPROCESSABLECONTENT,

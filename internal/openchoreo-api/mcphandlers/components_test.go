@@ -834,7 +834,7 @@ func TestUpdateReleaseBinding(t *testing.T) {
 	t.Run("same environment: no error", func(t *testing.T) {
 		rbSvc := releasebindingmocks.NewMockService(t)
 		rbSvc.EXPECT().GetReleaseBinding(mock.Anything, testNS, "comp-dev").Return(existingRB, nil)
-		rbSvc.EXPECT().UpdateReleaseBinding(mock.Anything, testNS, mock.Anything).Return(existingRB, nil)
+		rbSvc.EXPECT().UpdateReleaseBinding(mock.Anything, testNS, mock.Anything, mock.Anything).Return(existingRB, nil)
 
 		h := newTestHandler(withReleaseBindingService(rbSvc))
 		req := &gen.ReleaseBindingSpec{Environment: testEnvironmentName}
@@ -849,7 +849,7 @@ func TestUpdateReleaseBinding(t *testing.T) {
 		rbSvc.EXPECT().
 			UpdateReleaseBinding(mock.Anything, testNS, mock.MatchedBy(func(rb *openchoreov1alpha1.ReleaseBinding) bool {
 				return rb.Spec.ReleaseName == releaseName
-			})).
+			}), mock.Anything).
 			Return(existingRB, nil)
 
 		h := newTestHandler(withReleaseBindingService(rbSvc))
@@ -874,7 +874,7 @@ func TestUpdateReleaseBinding(t *testing.T) {
 		rbSvc.EXPECT().
 			UpdateReleaseBinding(mock.Anything, testNS, mock.MatchedBy(func(rb *openchoreov1alpha1.ReleaseBinding) bool {
 				return rb.Spec.State == openchoreov1alpha1.ReleaseState("Undeploy")
-			})).
+			}), mock.Anything).
 			Return(existingRB, nil)
 
 		h := newTestHandler(withReleaseBindingService(rbSvc))
@@ -920,7 +920,7 @@ func TestUpdateReleaseBinding(t *testing.T) {
 		rbSvc.EXPECT().
 			UpdateReleaseBinding(mock.Anything, testNS, mock.MatchedBy(func(rb *openchoreov1alpha1.ReleaseBinding) bool {
 				return rb.Spec.State == openchoreov1alpha1.ReleaseState("Active")
-			})).
+			}), mock.Anything).
 			Return(rbWithState, nil)
 
 		h := newTestHandler(withReleaseBindingService(rbSvc))

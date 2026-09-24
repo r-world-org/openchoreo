@@ -58,7 +58,7 @@ func (s *releaseBindingServiceWithAuthz) CreateReleaseBinding(ctx context.Contex
 	return s.internal.CreateReleaseBinding(ctx, namespaceName, rb)
 }
 
-func (s *releaseBindingServiceWithAuthz) UpdateReleaseBinding(ctx context.Context, namespaceName string, rb *openchoreov1alpha1.ReleaseBinding) (*openchoreov1alpha1.ReleaseBinding, error) {
+func (s *releaseBindingServiceWithAuthz) UpdateReleaseBinding(ctx context.Context, namespaceName string, rb *openchoreov1alpha1.ReleaseBinding, expectedRevision *string) (*openchoreov1alpha1.ReleaseBinding, error) {
 	// Fetch the existing release binding to get owner info for authz
 	existing, err := s.internal.GetReleaseBinding(ctx, namespaceName, rb.Name)
 	if err != nil {
@@ -81,7 +81,7 @@ func (s *releaseBindingServiceWithAuthz) UpdateReleaseBinding(ctx context.Contex
 	}); err != nil {
 		return nil, err
 	}
-	return s.internal.UpdateReleaseBinding(ctx, namespaceName, rb)
+	return s.internal.UpdateReleaseBinding(ctx, namespaceName, rb, expectedRevision)
 }
 
 func (s *releaseBindingServiceWithAuthz) ListReleaseBindings(ctx context.Context, namespaceName, componentName string, opts services.ListOptions) (*services.ListResult[openchoreov1alpha1.ReleaseBinding], error) {

@@ -254,9 +254,9 @@ func (_c *MockService_ListReleaseBindings_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// UpdateReleaseBinding provides a mock function with given fields: ctx, namespaceName, rb
-func (_m *MockService) UpdateReleaseBinding(ctx context.Context, namespaceName string, rb *v1alpha1.ReleaseBinding) (*v1alpha1.ReleaseBinding, error) {
-	ret := _m.Called(ctx, namespaceName, rb)
+// UpdateReleaseBinding provides a mock function with given fields: ctx, namespaceName, rb, expectedRevision
+func (_m *MockService) UpdateReleaseBinding(ctx context.Context, namespaceName string, rb *v1alpha1.ReleaseBinding, expectedRevision *string) (*v1alpha1.ReleaseBinding, error) {
+	ret := _m.Called(ctx, namespaceName, rb, expectedRevision)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateReleaseBinding")
@@ -264,19 +264,19 @@ func (_m *MockService) UpdateReleaseBinding(ctx context.Context, namespaceName s
 
 	var r0 *v1alpha1.ReleaseBinding
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v1alpha1.ReleaseBinding) (*v1alpha1.ReleaseBinding, error)); ok {
-		return rf(ctx, namespaceName, rb)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v1alpha1.ReleaseBinding, *string) (*v1alpha1.ReleaseBinding, error)); ok {
+		return rf(ctx, namespaceName, rb, expectedRevision)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v1alpha1.ReleaseBinding) *v1alpha1.ReleaseBinding); ok {
-		r0 = rf(ctx, namespaceName, rb)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v1alpha1.ReleaseBinding, *string) *v1alpha1.ReleaseBinding); ok {
+		r0 = rf(ctx, namespaceName, rb, expectedRevision)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1alpha1.ReleaseBinding)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v1alpha1.ReleaseBinding) error); ok {
-		r1 = rf(ctx, namespaceName, rb)
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v1alpha1.ReleaseBinding, *string) error); ok {
+		r1 = rf(ctx, namespaceName, rb, expectedRevision)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -293,13 +293,14 @@ type MockService_UpdateReleaseBinding_Call struct {
 //   - ctx context.Context
 //   - namespaceName string
 //   - rb *v1alpha1.ReleaseBinding
-func (_e *MockService_Expecter) UpdateReleaseBinding(ctx interface{}, namespaceName interface{}, rb interface{}) *MockService_UpdateReleaseBinding_Call {
-	return &MockService_UpdateReleaseBinding_Call{Call: _e.mock.On("UpdateReleaseBinding", ctx, namespaceName, rb)}
+//   - expectedRevision *string
+func (_e *MockService_Expecter) UpdateReleaseBinding(ctx interface{}, namespaceName interface{}, rb interface{}, expectedRevision interface{}) *MockService_UpdateReleaseBinding_Call {
+	return &MockService_UpdateReleaseBinding_Call{Call: _e.mock.On("UpdateReleaseBinding", ctx, namespaceName, rb, expectedRevision)}
 }
 
-func (_c *MockService_UpdateReleaseBinding_Call) Run(run func(ctx context.Context, namespaceName string, rb *v1alpha1.ReleaseBinding)) *MockService_UpdateReleaseBinding_Call {
+func (_c *MockService_UpdateReleaseBinding_Call) Run(run func(ctx context.Context, namespaceName string, rb *v1alpha1.ReleaseBinding, expectedRevision *string)) *MockService_UpdateReleaseBinding_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*v1alpha1.ReleaseBinding))
+		run(args[0].(context.Context), args[1].(string), args[2].(*v1alpha1.ReleaseBinding), args[3].(*string))
 	})
 	return _c
 }
@@ -309,7 +310,7 @@ func (_c *MockService_UpdateReleaseBinding_Call) Return(_a0 *v1alpha1.ReleaseBin
 	return _c
 }
 
-func (_c *MockService_UpdateReleaseBinding_Call) RunAndReturn(run func(context.Context, string, *v1alpha1.ReleaseBinding) (*v1alpha1.ReleaseBinding, error)) *MockService_UpdateReleaseBinding_Call {
+func (_c *MockService_UpdateReleaseBinding_Call) RunAndReturn(run func(context.Context, string, *v1alpha1.ReleaseBinding, *string) (*v1alpha1.ReleaseBinding, error)) *MockService_UpdateReleaseBinding_Call {
 	_c.Call.Return(run)
 	return _c
 }

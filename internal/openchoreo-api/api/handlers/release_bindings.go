@@ -137,7 +137,16 @@ func (h *Handler) GetReleaseBinding(
 		return gen.GetReleaseBinding500JSONResponse{InternalErrorJSONResponse: internalError()}, nil
 	}
 
-	return gen.GetReleaseBinding200JSONResponse(genRB), nil
+	revision, err := releasebindingsvc.SemanticWriteRevision(rb)
+	if err != nil {
+		h.logger.Error("Failed to compute release binding write revision", "error", err)
+		return gen.GetReleaseBinding500JSONResponse{InternalErrorJSONResponse: internalError()}, nil
+	}
+
+	return gen.GetReleaseBinding200JSONResponse{
+		Body:    genRB,
+		Headers: gen.GetReleaseBinding200ResponseHeaders{OpenChoreoWriteRevision: revision},
+	}, nil
 }
 
 // UpdateReleaseBinding replaces an existing release binding (full update).
@@ -149,6 +158,15 @@ func (h *Handler) UpdateReleaseBinding(
 
 	if request.Body == nil {
 		return gen.UpdateReleaseBinding400JSONResponse{BadRequestJSONResponse: badRequest("Request body is required")}, nil
+	}
+
+	var expectedRevision *string
+	if request.Params.IfOpenChoreoWriteRevision != nil {
+		parsed, err := releasebindingsvc.ParseWriteRevision(*request.Params.IfOpenChoreoWriteRevision)
+		if err != nil {
+			return gen.UpdateReleaseBinding400JSONResponse{BadRequestJSONResponse: badRequest("If-OpenChoreo-Write-Revision must contain exactly one valid ReleaseBinding write revision")}, nil
+		}
+		expectedRevision = &parsed
 	}
 
 	rbCR, err := convert[gen.ReleaseBinding, openchoreov1alpha1.ReleaseBinding](*request.Body)
@@ -164,13 +182,19 @@ func (h *Handler) UpdateReleaseBinding(
 	// Ensure the name from the URL path is used
 	rbCR.Name = request.ReleaseBindingName
 
-	updated, err := h.services.ReleaseBindingService.UpdateReleaseBinding(ctx, request.NamespaceName, &rbCR)
+	updated, err := h.services.ReleaseBindingService.UpdateReleaseBinding(ctx, request.NamespaceName, &rbCR, expectedRevision)
 	if err != nil {
 		if errors.Is(err, services.ErrForbidden) {
 			return gen.UpdateReleaseBinding403JSONResponse{ForbiddenJSONResponse: forbidden()}, nil
 		}
 		if errors.Is(err, releasebindingsvc.ErrReleaseBindingNotFound) {
 			return gen.UpdateReleaseBinding404JSONResponse{NotFoundJSONResponse: notFound("ReleaseBinding")}, nil
+		}
+		if errors.Is(err, releasebindingsvc.ErrReleaseBindingPreconditionFailed) {
+			return gen.UpdateReleaseBinding412JSONResponse{PreconditionFailedJSONResponse: preconditionFailed("ReleaseBinding write revision does not match current writable state")}, nil
+		}
+		if errors.Is(err, releasebindingsvc.ErrReleaseBindingConflict) {
+			return gen.UpdateReleaseBinding409JSONResponse{UpdateConflictJSONResponse: updateConflict("ReleaseBinding update conflict")}, nil
 		}
 		if validationErr, ok := errors.AsType[*services.ValidationError](err); ok {
 			if validationErr.StatusCode == http.StatusUnprocessableEntity {
@@ -191,7 +215,16 @@ func (h *Handler) UpdateReleaseBinding(
 	}
 
 	h.logger.Info("ReleaseBinding updated successfully", "namespaceName", request.NamespaceName, "releaseBinding", updated.Name)
-	return gen.UpdateReleaseBinding200JSONResponse(genRB), nil
+	revision, err := releasebindingsvc.SemanticWriteRevision(updated)
+	if err != nil {
+		h.logger.Error("Failed to compute updated release binding write revision", "error", err)
+		return gen.UpdateReleaseBinding500JSONResponse{InternalErrorJSONResponse: internalError()}, nil
+	}
+
+	return gen.UpdateReleaseBinding200JSONResponse{
+		Body:    genRB,
+		Headers: gen.UpdateReleaseBinding200ResponseHeaders{OpenChoreoWriteRevision: revision},
+	}, nil
 }
 
 // DeleteReleaseBinding deletes a release binding by name.

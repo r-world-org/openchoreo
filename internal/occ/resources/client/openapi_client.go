@@ -500,7 +500,7 @@ func (c *Client) ListWorkflowRuns(ctx context.Context, namespaceName string, par
 
 // UpdateReleaseBinding updates a release binding
 func (c *Client) UpdateReleaseBinding(ctx context.Context, namespaceName, bindingName string, req gen.ReleaseBinding) (*gen.ReleaseBinding, error) {
-	resp, err := c.client.UpdateReleaseBindingWithResponse(ctx, namespaceName, bindingName, req)
+	resp, err := c.client.UpdateReleaseBindingWithResponse(ctx, namespaceName, bindingName, nil, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update release binding: %w", err)
 	}

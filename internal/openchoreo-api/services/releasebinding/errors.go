@@ -6,7 +6,10 @@ package releasebinding
 import "errors"
 
 var (
-	ErrReleaseBindingNotFound      = errors.New("release binding not found")
-	ErrReleaseBindingAlreadyExists = errors.New("release binding already exists")
-	ErrComponentNotFound           = errors.New("component not found")
+	ErrReleaseBindingNotFound             = errors.New("release binding not found")
+	ErrReleaseBindingAlreadyExists        = errors.New("release binding already exists")
+	ErrReleaseBindingPreconditionFailed   = errors.New("release binding precondition failed")
+	ErrReleaseBindingConflict             = errors.New("release binding update conflict")
+	ErrInvalidReleaseBindingWriteRevision = errors.New("invalid release binding write revision")
+	ErrComponentNotFound                  = errors.New("component not found")
 )

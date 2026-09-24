@@ -71,12 +71,12 @@ func TestUpdateReleaseBinding_AuthzCheck(t *testing.T) {
 		pdp := testutil.AllowPDP()
 		mockSvc := mocks.NewMockService(t)
 		mockSvc.On("GetReleaseBinding", mock.Anything, "ns-1", "my-rb").Return(rb, nil)
-		mockSvc.On("UpdateReleaseBinding", mock.Anything, "ns-1", rb).Return(rb, nil)
+		mockSvc.On("UpdateReleaseBinding", mock.Anything, "ns-1", rb, (*string)(nil)).Return(rb, nil)
 		svc := &releaseBindingServiceWithAuthz{
 			internal: mockSvc,
 			authz:    testutil.NewTestAuthzChecker(pdp),
 		}
-		result, err := svc.UpdateReleaseBinding(testutil.AuthzContext(), "ns-1", rb)
+		result, err := svc.UpdateReleaseBinding(testutil.AuthzContext(), "ns-1", rb, nil)
 		require.NoError(t, err)
 		require.Equal(t, rb, result)
 		require.Len(t, pdp.Captured, 1)
@@ -91,7 +91,7 @@ func TestUpdateReleaseBinding_AuthzCheck(t *testing.T) {
 			internal: mockSvc,
 			authz:    testutil.NewTestAuthzChecker(pdp),
 		}
-		_, err := svc.UpdateReleaseBinding(testutil.AuthzContext(), "ns-1", rb)
+		_, err := svc.UpdateReleaseBinding(testutil.AuthzContext(), "ns-1", rb, nil)
 		require.ErrorIs(t, err, services.ErrForbidden)
 	})
 
@@ -104,7 +104,7 @@ func TestUpdateReleaseBinding_AuthzCheck(t *testing.T) {
 			internal: mockSvc,
 			authz:    testutil.NewTestAuthzChecker(pdp),
 		}
-		_, err := svc.UpdateReleaseBinding(testutil.AuthzContext(), "ns-1", rb)
+		_, err := svc.UpdateReleaseBinding(testutil.AuthzContext(), "ns-1", rb, nil)
 		require.ErrorIs(t, err, fetchErr)
 		require.Empty(t, pdp.Captured, "authz should not be called when fetch fails")
 	})
