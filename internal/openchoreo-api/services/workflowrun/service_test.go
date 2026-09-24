@@ -59,6 +59,129 @@ func TestCreateWorkflowRun(t *testing.T) {
 		assert.Equal(t, testNamespace, result.Namespace)
 	})
 
+	t.Run("omitted kind defaults to cluster workflow ref", func(t *testing.T) {
+		cwf := testutil.NewClusterWorkflow(testWorkflowName)
+		svc := newService(t, cwf)
+
+		run := testutil.NewWorkflowRun(
+			testNamespace,
+			testWorkflowName,
+			testRunName,
+		)
+		run.Spec.Workflow.Kind = ""
+
+		result, err := svc.CreateWorkflowRun(
+			ctx,
+			testNamespace,
+			run,
+		)
+		require.NoError(t, err)
+
+		assert.Equal(
+			t,
+			openchoreov1alpha1.WorkflowRefKindClusterWorkflow,
+			result.Spec.Workflow.Kind,
+		)
+
+		stored := &openchoreov1alpha1.WorkflowRun{}
+
+		require.NoError(
+			t,
+			svc.(*workflowRunService).k8sClient.Get(
+				ctx,
+				client.ObjectKey{
+					Name:      testRunName,
+					Namespace: testNamespace,
+				},
+				stored,
+			),
+		)
+
+		assert.Equal(
+			t,
+			openchoreov1alpha1.WorkflowRefKindClusterWorkflow,
+			stored.Spec.Workflow.Kind,
+		)
+	})
+
+	t.Run("omitted kind does not fall back to same-name namespaced workflow", func(t *testing.T) {
+		wf := testutil.NewWorkflow(
+			testNamespace,
+			testWorkflowName,
+		)
+		svc := newService(t, wf)
+
+		run := testutil.NewWorkflowRun(
+			testNamespace,
+			testWorkflowName,
+			testRunName,
+		)
+		run.Spec.Workflow.Kind = ""
+
+		_, err := svc.CreateWorkflowRun(
+			ctx,
+			testNamespace,
+			run,
+		)
+
+		require.ErrorIs(
+			t,
+			err,
+			ErrWorkflowNotFound,
+		)
+	})
+
+	t.Run("omitted kind chooses cluster workflow when same-name resources both exist", func(t *testing.T) {
+		wf := testutil.NewWorkflow(
+			testNamespace,
+			testWorkflowName,
+		)
+		cwf := testutil.NewClusterWorkflow(
+			testWorkflowName,
+		)
+		svc := newService(t, wf, cwf)
+
+		run := testutil.NewWorkflowRun(
+			testNamespace,
+			testWorkflowName,
+			testRunName,
+		)
+		run.Spec.Workflow.Kind = ""
+
+		result, err := svc.CreateWorkflowRun(
+			ctx,
+			testNamespace,
+			run,
+		)
+		require.NoError(t, err)
+
+		assert.Equal(
+			t,
+			openchoreov1alpha1.WorkflowRefKindClusterWorkflow,
+			result.Spec.Workflow.Kind,
+		)
+
+		stored := &openchoreov1alpha1.WorkflowRun{}
+
+		require.NoError(
+			t,
+			svc.(*workflowRunService).k8sClient.Get(
+				ctx,
+				client.ObjectKey{
+					Name:      testRunName,
+					Namespace: testNamespace,
+				},
+				stored,
+			),
+		)
+
+		assert.Equal(
+			t,
+			openchoreov1alpha1.WorkflowRefKindClusterWorkflow,
+			stored.Spec.Workflow.Kind,
+		)
+	})
+
 	t.Run("nil input", func(t *testing.T) {
 		svc := newService(t)
 

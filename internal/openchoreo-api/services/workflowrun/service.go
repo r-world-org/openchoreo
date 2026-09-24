@@ -65,6 +65,11 @@ func (s *workflowRunService) CreateWorkflowRun(ctx context.Context, namespaceNam
 		return nil, fmt.Errorf("workflow run cannot be nil")
 	}
 
+	// Apply the WorkflowRunConfig CRD default before any pre-admission
+	// reference lookup. An omitted kind means ClusterWorkflow everywhere:
+	// authorization, lookup, persistence, controller resolution, and audit.
+	wfRun.Spec.Workflow.Kind = normalizeWorkflowRefKind(wfRun.Spec.Workflow.Kind)
+
 	s.logger.Debug("Creating workflow run", "namespace", namespaceName, "name", wfRun.Name)
 
 	// Verify the referenced workflow exists based on the kind
