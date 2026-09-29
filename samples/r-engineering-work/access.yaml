@@ -1,0 +1,33 @@
+# Dedicated product caller authorization for the fixed r-engineering-work WorkflowRun.
+# The OAuth client credential is provisioned by the runtime identity owner and is
+# deliberately not stored in this repository.
+apiVersion: openchoreo.dev/v1alpha1
+kind: ClusterAuthzRole
+metadata:
+  name: r-engineering-work-runner
+spec:
+  description: Create and view only the fixed r-engineering-work WorkflowRun
+  actions:
+    - workflowrun:create
+    - workflowrun:view
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: ClusterAuthzRoleBinding
+metadata:
+  name: r-engineering-work-runner-binding
+spec:
+  roleMappings:
+    - roleRef:
+        kind: ClusterAuthzRole
+        name: r-engineering-work-runner
+      scope:
+        namespace: r-engineering
+      conditions:
+        - actions:
+            - workflowrun:create
+            - workflowrun:view
+          expression: resource.workflow == "r-engineering-work"
+  entitlement:
+    claim: client_id
+    value: r-engineering-work-client
+  effect: allow

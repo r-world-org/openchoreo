@@ -321,6 +321,23 @@ func TestListWorkflowRuns_Authz(t *testing.T) {
 		assert.Len(t, result.Items, 1)
 		assert.Equal(t, "run-1", result.Items[0].Name)
 	})
+
+	t.Run("checks each run with its referenced workflow", func(t *testing.T) {
+		mockSvc := wfrmocks.NewMockService(t)
+		mockPDP := authzmocks.NewMockPDP(t)
+
+		mockSvc.EXPECT().ListWorkflowRuns(mock.Anything, testNamespace, "", "", "", mock.Anything).
+			Return(&services.ListResult[openchoreov1alpha1.WorkflowRun]{Items: []openchoreov1alpha1.WorkflowRun{*r1}}, nil)
+		mockPDP.EXPECT().Evaluate(mock.Anything, mock.MatchedBy(func(req *authz.EvaluateRequest) bool {
+			return req.Action == authz.ActionViewWorkflowRun &&
+				req.Context.Resource.Workflow == testNamespace+"/"+testWorkflowName
+		})).Return(allowDecision(), nil)
+
+		svc := newAuthzService(t, mockSvc, mockPDP)
+		result, err := svc.ListWorkflowRuns(ctxWithSubject(), testNamespace, "", "", "", services.ListOptions{})
+		require.NoError(t, err)
+		require.Len(t, result.Items, 1)
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +386,7 @@ func TestGetWorkflowRun_Authz(t *testing.T) {
 		require.ErrorIs(t, err, workflowrun.ErrWorkflowRunNotFound)
 	})
 
-	t.Run("checks view action with hierarchy from fetched labels", func(t *testing.T) {
+	t.Run("checks view action with hierarchy and workflow from fetched run", func(t *testing.T) {
 		mockSvc := wfrmocks.NewMockService(t)
 		mockPDP := authzmocks.NewMockPDP(t)
 
@@ -378,7 +395,8 @@ func TestGetWorkflowRun_Authz(t *testing.T) {
 			return req.Action == authz.ActionViewWorkflowRun &&
 				req.Resource.Hierarchy.Namespace == testNamespace &&
 				req.Resource.Hierarchy.Project == testProjectName &&
-				req.Resource.Hierarchy.Component == testComponentName
+				req.Resource.Hierarchy.Component == testComponentName &&
+				req.Context.Resource.Workflow == testNamespace+"/"+testWorkflowName
 		})).Return(allowDecision(), nil)
 
 		svc := newAuthzService(t, mockSvc, mockPDP)
@@ -494,7 +512,10 @@ func TestGetWorkflowRunLogs_Authz(t *testing.T) {
 
 		logEntries := []models.WorkflowRunLogEntry{{Timestamp: "2026-01-01T00:00:00Z", Log: "test log"}}
 		mockSvc.EXPECT().GetWorkflowRun(mock.Anything, testNamespace, testRunName).Return(run, nil)
-		mockPDP.EXPECT().Evaluate(mock.Anything, mock.Anything).Return(allowDecision(), nil)
+		mockPDP.EXPECT().Evaluate(mock.Anything, mock.MatchedBy(func(req *authz.EvaluateRequest) bool {
+			return req.Action == authz.ActionViewWorkflowRun &&
+				req.Context.Resource.Workflow == testNamespace+"/"+testWorkflowName
+		})).Return(allowDecision(), nil)
 		mockSvc.EXPECT().GetWorkflowRunLogs(mock.Anything, testNamespace, testRunName, "task-1", (*int64)(nil)).
 			Return(logEntries, nil)
 
@@ -543,7 +564,10 @@ func TestGetWorkflowRunEvents_Authz(t *testing.T) {
 
 		events := []models.WorkflowRunEventEntry{{Timestamp: "2026-01-01T00:00:00Z", Type: "Normal", Reason: "Started", Message: "pod started"}}
 		mockSvc.EXPECT().GetWorkflowRun(mock.Anything, testNamespace, testRunName).Return(run, nil)
-		mockPDP.EXPECT().Evaluate(mock.Anything, mock.Anything).Return(allowDecision(), nil)
+		mockPDP.EXPECT().Evaluate(mock.Anything, mock.MatchedBy(func(req *authz.EvaluateRequest) bool {
+			return req.Action == authz.ActionViewWorkflowRun &&
+				req.Context.Resource.Workflow == testNamespace+"/"+testWorkflowName
+		})).Return(allowDecision(), nil)
 		mockSvc.EXPECT().GetWorkflowRunEvents(mock.Anything, testNamespace, testRunName, "task-1").
 			Return(events, nil)
 
@@ -592,7 +616,10 @@ func TestGetWorkflowRunStatus_Authz(t *testing.T) {
 
 		statusResp := &models.WorkflowRunStatusResponse{Status: workflowrun.ExportStatusPending}
 		mockSvc.EXPECT().GetWorkflowRun(mock.Anything, testNamespace, testRunName).Return(run, nil)
-		mockPDP.EXPECT().Evaluate(mock.Anything, mock.Anything).Return(allowDecision(), nil)
+		mockPDP.EXPECT().Evaluate(mock.Anything, mock.MatchedBy(func(req *authz.EvaluateRequest) bool {
+			return req.Action == authz.ActionViewWorkflowRun &&
+				req.Context.Resource.Workflow == testNamespace+"/"+testWorkflowName
+		})).Return(allowDecision(), nil)
 		mockSvc.EXPECT().GetWorkflowRunStatus(mock.Anything, testNamespace, testRunName).Return(statusResp, nil)
 
 		svc := newAuthzService(t, mockSvc, mockPDP)

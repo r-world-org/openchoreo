@@ -89,6 +89,87 @@ func syncPolicies(t *testing.T, enforcer *CasbinEnforcer, policies [][]string) {
 	}
 }
 
+func TestREngineeringWorkCallerMinimumPermissions(t *testing.T) {
+	const (
+		caller    = "r-engineering-work-client"
+		namespace = "r-engineering"
+		role      = "r-engineering-work-runner"
+		workflow  = "r-engineering-work"
+	)
+
+	enforcer := setupTestEnforcer(t)
+	syncGroupingPolicies(t, enforcer, [][]string{
+		{role, authzcore.ActionCreateWorkflowRun, "*"},
+		{role, authzcore.ActionViewWorkflowRun, "*"},
+	})
+	syncPolicies(t, enforcer, [][]string{
+		{
+			"client_id:" + caller,
+			"ns/" + namespace,
+			role,
+			"*",
+			string(authzcore.PolicyEffectAllow),
+			mustCondsJSON(t, []openchoreov1alpha1.AuthzCondition{
+				{
+					Actions: []string{
+						authzcore.ActionCreateWorkflowRun,
+						authzcore.ActionViewWorkflowRun,
+					},
+					Expression: `resource.workflow == "r-engineering-work"`,
+				},
+			}),
+			"r-engineering-work-runner-binding",
+		},
+	})
+
+	subject := &authzcore.SubjectContext{
+		Type:              "service_account",
+		EntitlementClaim:  "client_id",
+		EntitlementValues: []string{caller},
+	}
+	evaluate := func(t *testing.T, action, workflowName string) bool {
+		t.Helper()
+		decision, err := enforcer.Evaluate(context.Background(), &authzcore.EvaluateRequest{
+			SubjectContext: subject,
+			Resource: authzcore.Resource{
+				Type:      "workflowrun",
+				ID:        "rw-926-run",
+				Hierarchy: authzcore.ResourceHierarchy{Namespace: namespace},
+			},
+			Action: action,
+			Context: authzcore.Context{
+				Resource: authzcore.ResourceAttribute{Workflow: workflowName},
+			},
+		})
+		require.NoError(t, err)
+		return decision.Decision
+	}
+
+	tests := []struct {
+		name     string
+		action   string
+		workflow string
+		want     bool
+	}{
+		{name: "fixed workflow create", action: authzcore.ActionCreateWorkflowRun, workflow: workflow, want: true},
+		{name: "fixed workflow view", action: authzcore.ActionViewWorkflowRun, workflow: workflow, want: true},
+		{name: "arbitrary workflow create", action: authzcore.ActionCreateWorkflowRun, workflow: "arbitrary-workflow", want: false},
+		{name: "arbitrary workflow view", action: authzcore.ActionViewWorkflowRun, workflow: "arbitrary-workflow", want: false},
+		{name: "workflow update", action: authzcore.ActionUpdateWorkflowRun, workflow: workflow, want: false},
+		{name: "workflow delete", action: authzcore.ActionDeleteWorkflowRun, workflow: workflow, want: false},
+		{name: "admin mutation", action: authzcore.ActionCreateClusterAuthzRoleBinding, workflow: workflow, want: false},
+		{name: "deployment", action: authzcore.ActionCreateDeploymentPipeline, workflow: workflow, want: false},
+		{name: "secret mutation", action: authzcore.ActionCreateSecretReference, workflow: workflow, want: false},
+		{name: "shell execution", action: authzcore.ActionExecComponent, workflow: workflow, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, evaluate(t, tt.action, tt.workflow))
+		})
+	}
+}
+
 // TestCasbinEnforcer_Evaluate_ClusterRoles_Focused tests authorization with cluster-scoped roles only
 func TestCasbinEnforcer_Evaluate_ClusterRoles_Focused(t *testing.T) {
 	enforcer := setupTestEnforcer(t)
