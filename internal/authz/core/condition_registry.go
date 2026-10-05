@@ -73,6 +73,7 @@ var conditionRegistry = map[string][]AttributeSpec{
 	ActionUpdateResource:               {AttrResourceResourceType},
 	ActionDeleteResource:               {AttrResourceResourceType},
 	ActionCreateWorkflowRun:            {AttrResourceWorkflow},
+	ActionViewWorkflowRun:              {AttrResourceWorkflow},
 	ActionUpdateWorkflowRun:            {AttrResourceWorkflow},
 	ActionDeleteWorkflowRun:            {AttrResourceWorkflow},
 	ActionCreateReleaseBinding:         {AttrResourceEnvironment},

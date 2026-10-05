@@ -81,9 +81,10 @@ func TestLookupConditions(t *testing.T) {
 		}
 	})
 
-	t.Run("workflowrun mutating actions support resource.workflow", func(t *testing.T) {
+	t.Run("workflowrun create and read actions support resource.workflow", func(t *testing.T) {
 		for _, action := range []string{
 			ActionCreateWorkflowRun,
+			ActionViewWorkflowRun,
 			ActionUpdateWorkflowRun,
 			ActionDeleteWorkflowRun,
 		} {

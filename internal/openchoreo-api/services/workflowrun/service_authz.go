@@ -55,6 +55,14 @@ func formatWorkflowAttr(namespace string, kind openchoreov1alpha1.WorkflowRefKin
 	return services.FormatDualScopedResourceName(namespace, name, isClusterScoped)
 }
 
+func workflowRunAuthzContext(namespace string, wr *openchoreov1alpha1.WorkflowRun) authz.Context {
+	return authz.Context{
+		Resource: authz.ResourceAttribute{
+			Workflow: formatWorkflowAttr(namespace, wr.Spec.Workflow.Kind, wr.Spec.Workflow.Name),
+		},
+	}
+}
+
 // constructHierarchyForAuthzCheck builds a ResourceHierarchy from workflow run labels.
 // If both project and component labels are present, it returns a component-level hierarchy; otherwise it falls back to namespace-level.
 func constructHierarchyForAuthzCheck(namespaceName string, labels map[string]string) authz.ResourceHierarchy {
@@ -124,6 +132,7 @@ func (s *workflowRunServiceWithAuthz) ListWorkflowRuns(ctx context.Context, name
 				ResourceType: resourceTypeWorkflowRun,
 				ResourceID:   wr.Name,
 				Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+				Context:      workflowRunAuthzContext(namespaceName, &wr),
 			}
 		},
 	)
@@ -139,6 +148,7 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRun(ctx context.Context, namesp
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      workflowRunAuthzContext(namespaceName, wr),
 	}); err != nil {
 		return nil, err
 	}
@@ -155,11 +165,7 @@ func (s *workflowRunServiceWithAuthz) DeleteWorkflowRun(ctx context.Context, nam
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
-		Context: authz.Context{
-			Resource: authz.ResourceAttribute{
-				Workflow: formatWorkflowAttr(namespaceName, wr.Spec.Workflow.Kind, wr.Spec.Workflow.Name),
-			},
-		},
+		Context:      workflowRunAuthzContext(namespaceName, wr),
 	}); err != nil {
 		return err
 	}
@@ -176,6 +182,7 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunLogs(ctx context.Context, na
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      workflowRunAuthzContext(namespaceName, wr),
 	}); err != nil {
 		return nil, err
 	}
@@ -192,6 +199,7 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunEvents(ctx context.Context, 
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      workflowRunAuthzContext(namespaceName, wr),
 	}); err != nil {
 		return nil, err
 	}
@@ -208,6 +216,7 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunStatus(ctx context.Context, 
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      workflowRunAuthzContext(namespaceName, wr),
 	}); err != nil {
 		return nil, err
 	}

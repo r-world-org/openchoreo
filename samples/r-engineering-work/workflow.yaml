@@ -1,0 +1,25 @@
+# Fixed product WorkflowRun admission target for r-engineering work.
+# This workflow deliberately performs no engineering or infrastructure mutation.
+apiVersion: openchoreo.dev/v1alpha1
+kind: ClusterWorkflow
+metadata:
+  name: r-engineering-work
+  labels:
+    r.world/purpose: product-workflow-admission
+spec:
+  workflowPlaneRef:
+    kind: ClusterWorkflowPlane
+    name: default
+  runTemplate:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Workflow
+    metadata:
+      name: ${metadata.workflowRunName}
+      namespace: ${metadata.namespace}
+    spec:
+      entrypoint: admission
+      serviceAccountName: workflow-sa
+      templates:
+        - name: admission
+          suspend:
+            duration: "1s"
