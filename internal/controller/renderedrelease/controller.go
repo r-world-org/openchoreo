@@ -137,6 +137,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		logger.Error(err, "Failed to make desired resources")
 		return ctrl.Result{}, err
 	}
+	budgetTargets, err := r.projectBudgetTargets(ctx, release, desiredResources)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Ensure namespaces exist before applying resources on the observability plane only.
 	// The data plane's cell namespace is owned by the ProjectReleaseBinding, so the DP
@@ -185,7 +189,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// This queries both current resource types (from spec) and previous resource types (from status)
 	// to ensure we find all resources that might need cleanup, preventing resource leaks
 	gvks := findAllKnownGVKs(desiredResources, release.Status.Resources, targetPlane)
-	liveResources, err := r.listLiveResourcesByGVKs(ctx, planeClient, release, gvks)
+	liveResources, err := r.listLiveResourcesByGVKs(ctx, planeClient, release, gvks, budgetTargets)
 	if err != nil {
 		logger.Error(err, "Failed to list live resources from target plane", "targetPlane", targetPlane)
 		return ctrl.Result{}, err
@@ -583,11 +587,17 @@ func findAllKnownGVKs(desiredResources []*unstructured.Unstructured, appliedReso
 }
 
 // listLiveResourcesByGVKs queries specific resource types with label selector
-func (r *Reconciler) listLiveResourcesByGVKs(ctx context.Context, planeClient client.Client, release *openchoreov1alpha1.RenderedRelease, gvks []schema.GroupVersionKind) ([]*unstructured.Unstructured, error) {
-	var allLiveResources []*unstructured.Unstructured
+func (r *Reconciler) listLiveResourcesByGVKs(ctx context.Context, planeClient client.Client, release *openchoreov1alpha1.RenderedRelease, gvks []schema.GroupVersionKind, budgetTargets projectBudgetInventory) ([]*unstructured.Unstructured, error) {
+	allLiveResources, err := budgetTargets.read(ctx, planeClient, release)
+	if err != nil {
+		return nil, err
+	}
 
 	// Query each GVK with our label selector
 	for _, gvk := range gvks {
+		if budgetTargets != nil && isCellBudget(gvk) {
+			continue
+		}
 		// Create unstructured list for this GVK
 		list := &unstructured.UnstructuredList{}
 		list.SetGroupVersionKind(schema.GroupVersionKind{

@@ -1663,7 +1663,7 @@ var _ = Describe("listLiveResourcesByGVKs", func() {
 		It("should return an empty list", func() {
 			r := &Reconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			release := makeRelease("nonexistent-uid-99999")
-			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK})
+			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK}, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(BeEmpty())
 		})
@@ -1682,7 +1682,7 @@ var _ = Describe("listLiveResourcesByGVKs", func() {
 		It("should find the matching resources", func() {
 			r := &Reconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			release := makeRelease(releaseUID)
-			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK})
+			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK}, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(HaveLen(1))
 			Expect(result[0].GetName()).To(Equal(cmName))
@@ -1705,7 +1705,7 @@ var _ = Describe("listLiveResourcesByGVKs", func() {
 		It("should exclude resources without matching labels", func() {
 			r := &Reconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			release := makeRelease("uid-for-nomatch-test")
-			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK})
+			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK}, nil)
 			Expect(err).NotTo(HaveOccurred())
 			for _, res := range result {
 				Expect(res.GetName()).NotTo(Equal(cmName))
@@ -1718,7 +1718,7 @@ var _ = Describe("listLiveResourcesByGVKs", func() {
 			r := &Reconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			unknownGVK := schema.GroupVersionKind{Group: "unknown.example.com", Version: "v1", Kind: "NonExistentResource"}
 			release := makeRelease("some-uid-unknown-gvk")
-			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{unknownGVK})
+			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{unknownGVK}, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(BeEmpty())
 		})
@@ -1730,7 +1730,7 @@ var _ = Describe("listLiveResourcesByGVKs", func() {
 			cancelledCtx, cancel := context.WithCancel(ctx)
 			cancel()
 			release := makeRelease("uid-list-failure")
-			_, err := r.listLiveResourcesByGVKs(cancelledCtx, k8sClient, release, []schema.GroupVersionKind{configMapGVK})
+			_, err := r.listLiveResourcesByGVKs(cancelledCtx, k8sClient, release, []schema.GroupVersionKind{configMapGVK}, nil)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -1749,7 +1749,7 @@ var _ = Describe("listLiveResourcesByGVKs", func() {
 			r := &Reconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 			release := makeRelease(releaseUID)
 			serviceGVK := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}
-			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK, serviceGVK})
+			result, err := r.listLiveResourcesByGVKs(ctx, k8sClient, release, []schema.GroupVersionKind{configMapGVK, serviceGVK}, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(HaveLen(1))
 			Expect(result[0].GetName()).To(Equal(cmName))

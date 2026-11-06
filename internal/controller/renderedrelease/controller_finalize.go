@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -82,10 +81,9 @@ func (r *Reconciler) finalizeDataPlane(ctx context.Context, old, release *opench
 		return ctrl.Result{}, fmt.Errorf("failed to get dataplane client for finalization: %w", err)
 	}
 
-	// STEP 3: List all live resources we manage (use empty desired resources since we want to delete everything)
-	var emptyDesiredResources []*unstructured.Unstructured
-	gvks := findAllKnownGVKs(emptyDesiredResources, release.Status.Resources, targetPlaneDataPlane)
-	liveResources, err := r.listLiveResourcesByGVKs(ctx, planeClient, release, gvks)
+	// Discover previously applied resources, including named budgets that may
+	// have been applied before their status was persisted.
+	liveResources, err := r.discoverDataPlaneCleanupResources(ctx, planeClient, release)
 	if err != nil {
 		meta.SetStatusCondition(&release.Status.Conditions, NewRenderedReleaseCleanupFailedCondition(release.Generation, err))
 		if updateErr := controller.UpdateStatusConditions(ctx, r.Client, old, release); updateErr != nil {
@@ -152,7 +150,7 @@ func (r *Reconciler) finalizeObsPlane(ctx context.Context, old, release *opencho
 
 	// STEP 3: List the obs-plane resource types managed by this release
 	releaseResourceGVKs := r.intersectObsPlaneGVKs(ctx, release)
-	liveResources, err := r.listLiveResourcesByGVKs(ctx, planeClient, release, releaseResourceGVKs)
+	liveResources, err := r.listLiveResourcesByGVKs(ctx, planeClient, release, releaseResourceGVKs, nil)
 	if err != nil {
 		meta.SetStatusCondition(&release.Status.Conditions, NewRenderedReleaseCleanupFailedCondition(release.Generation, err))
 		if updateErr := controller.UpdateStatusConditions(ctx, r.Client, old, release); updateErr != nil {
